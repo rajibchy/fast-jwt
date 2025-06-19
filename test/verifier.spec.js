@@ -469,399 +469,568 @@ test('it validates if the token has not expired including the clock tolerance', 
   )
 })
 
+test('rejects token with negative exp', t => {
+  t.mock.timers.enable({ now: 0 })
+  const token = createSigner({ key: 'secret', expiresIn: -120000 })({ a: 1 })
+
+  t.assert.throws(() => verify(token), { message: 'The token has expired at 1969-12-31T23:58:00.000Z.' })
+})
+
 test('it validates the jti claim only if explicitily enabled', t => {
-  t.assert.throws(
-    () => {
-      return verify(
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhIjoxLCJqdGkiOjEsImF1ZCI6MiwiaXNzIjozLCJzdWIiOjQsIm5vbmNlIjo1fQ.J-oaiNMlIJfH1jlNZcRjcEXdG5La4lKGjYtoLMs8vKM',
-        { allowedJti: 'JTI1' }
-      )
-    },
-    { message: 'The jti claim must be a string.' }
-  )
+  t.mock.timers.enable({ now: 100000 })
+  const sign = createSigner({ key: 'secret' })
 
-  t.assert.throws(
-    () => {
-      return verify(
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhIjoxLCJqdGkiOiJKVEkiLCJhdWQiOlsiQVVEMSIsIkRVQTIiXSwiaXNzIjoiSVNTIiwic3ViIjoiU1VCIiwibm9uY2UiOiJOT05DRSJ9.8fqzi23J-GjaD7rW3OYJv8UtBYkx8MOkViJjS4sXmVw',
-        { allowedJti: 'JTI1' }
-      )
-    },
-    { message: 'The jti claim value is not allowed.' }
-  )
+  let token = sign({
+    a: 1,
+    jti: 1,
+    aud: 2,
+    iss: 3,
+    sub: 4,
+    nonce: 5
+  })
+  t.assert.throws(() => verify(token, { allowedJti: 'JTI1' }), { message: 'The jti claim must be a string.' })
 
-  t.assert.throws(
-    () => {
-      return verify(
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhIjoxLCJqdGkiOiJKVEkiLCJhdWQiOlsiQVVEMSIsIkRVQTIiXSwiaXNzIjoiSVNTIiwic3ViIjoiU1VCIiwibm9uY2UiOiJOT05DRSJ9.8fqzi23J-GjaD7rW3OYJv8UtBYkx8MOkViJjS4sXmVw',
-        { allowedJti: [/abc/, 'cde'] }
-      )
-    },
-    { message: 'The jti claim value is not allowed.' }
-  )
+  token = sign({
+    a: 1,
+    jti: ['JTI', 'JTI1'],
+    aud: ['AUD1'],
+    iss: 'ISS',
+    sub: 'SUB',
+    nonce: 'NONCE'
+  })
+  t.assert.throws(() => verify(token, { allowedJti: ['JTI'] }), { message: 'The jti claim must be a string.' })
 
-  t.assert.deepStrictEqual(
-    verify(
-      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhIjoxLCJqdGkiOiJKVEkiLCJhdWQiOlsiQVVEMSIsIkRVQTIiXSwiaXNzIjoiSVNTIiwic3ViIjoiU1VCIiwibm9uY2UiOiJOT05DRSJ9.8fqzi23J-GjaD7rW3OYJv8UtBYkx8MOkViJjS4sXmVw',
-      { allowedJti: 'JTI' }
-    ),
-    {
-      a: 1,
-      jti: 'JTI',
-      aud: ['AUD1', 'DUA2'],
-      iss: 'ISS',
-      sub: 'SUB',
-      nonce: 'NONCE'
-    }
-  )
+  token = sign({
+    a: 1,
+    jti: 'JTI',
+    aud: ['AUD1', 'DUA2'],
+    iss: 'ISS',
+    sub: 'SUB',
+    nonce: 'NONCE'
+  })
+  t.assert.throws(() => verify(token, { allowedJti: 'JTI1' }), { message: 'The jti claim value is not allowed.' })
 
-  t.assert.deepStrictEqual(
-    verify(
-      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhIjoxLCJqdGkiOiJKVEkiLCJhdWQiOlsiQVVEMSIsIkRVQTIiXSwiaXNzIjoiSVNTIiwic3ViIjoiU1VCIiwibm9uY2UiOiJOT05DRSJ9.8fqzi23J-GjaD7rW3OYJv8UtBYkx8MOkViJjS4sXmVw',
-      { allowedJti: ['ABX', 'JTI'] }
-    ),
-    {
-      a: 1,
-      jti: 'JTI',
-      aud: ['AUD1', 'DUA2'],
-      iss: 'ISS',
-      sub: 'SUB',
-      nonce: 'NONCE'
-    }
-  )
+  token = sign({
+    a: 1,
+    jti: 'JTI',
+    aud: ['AUD1', 'DUA2'],
+    iss: 'ISS',
+    sub: 'SUB',
+    nonce: 'NONCE'
+  })
+  t.assert.throws(() => verify(token, { allowedJti: [/abc/, 'cde'] }), {
+    message: 'The jti claim value is not allowed.'
+  })
 
-  t.assert.deepStrictEqual(
-    verify(
-      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhIjoxLCJqdGkiOiJKVEkiLCJhdWQiOlsiQVVEMSIsIkRVQTIiXSwiaXNzIjoiSVNTIiwic3ViIjoiU1VCIiwibm9uY2UiOiJOT05DRSJ9.8fqzi23J-GjaD7rW3OYJv8UtBYkx8MOkViJjS4sXmVw',
-      { allowedJti: ['ABX', /^J/] }
-    ),
-    {
-      a: 1,
-      jti: 'JTI',
-      aud: ['AUD1', 'DUA2'],
-      iss: 'ISS',
-      sub: 'SUB',
-      nonce: 'NONCE'
-    }
-  )
+  token = sign({
+    a: 1,
+    jti: 'JTI',
+    aud: ['AUD1', 'DUA2'],
+    iss: 'ISS',
+    sub: 'SUB',
+    nonce: 'NONCE'
+  })
+  t.assert.deepStrictEqual(verify(token, { allowedJti: 'JTI' }), {
+    a: 1,
+    iat: 100,
+    jti: 'JTI',
+    aud: ['AUD1', 'DUA2'],
+    iss: 'ISS',
+    sub: 'SUB',
+    nonce: 'NONCE'
+  })
+
+  token = sign({
+    a: 1,
+    jti: 'JTI',
+    aud: ['AUD1', 'DUA2'],
+    iss: 'ISS',
+    sub: 'SUB',
+    nonce: 'NONCE'
+  })
+  t.assert.deepStrictEqual(verify(token, { allowedJti: ['ABX', 'JTI'] }), {
+    a: 1,
+    iat: 100,
+    jti: 'JTI',
+    aud: ['AUD1', 'DUA2'],
+    iss: 'ISS',
+    sub: 'SUB',
+    nonce: 'NONCE'
+  })
+
+  token = sign({
+    a: 1,
+    jti: 'JTI',
+    aud: ['AUD1', 'DUA2'],
+    iss: 'ISS',
+    sub: 'SUB',
+    nonce: 'NONCE'
+  })
+  t.assert.deepStrictEqual(verify(token, { allowedJti: ['ABX', /^J/] }), {
+    a: 1,
+    iat: 100,
+    jti: 'JTI',
+    aud: ['AUD1', 'DUA2'],
+    iss: 'ISS',
+    sub: 'SUB',
+    nonce: 'NONCE'
+  })
 })
 
 test('it validates the aud claim only if explicitily enabled', t => {
-  t.assert.throws(
-    () => {
-      return verify(
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhIjoxLCJqdGkiOjEsImF1ZCI6MiwiaXNzIjozLCJzdWIiOjQsIm5vbmNlIjo1fQ.J-oaiNMlIJfH1jlNZcRjcEXdG5La4lKGjYtoLMs8vKM',
-        { allowedAud: 'AUD2' }
-      )
-    },
-    { message: 'The aud claim must be a string or an array of strings.' }
-  )
+  t.mock.timers.enable({ now: 100000 })
+  const sign = createSigner({ key: 'secret' })
 
-  t.assert.throws(
-    () => {
-      return verify(
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhIjoxLCJqdGkiOjEsImF1ZCI6WzIuMSwyLjJdLCJpc3MiOjMsInN1YiI6NCwibm9uY2UiOjV9._qE95j2r4UQ8BEXGZRv9stn5OLg1I3nQBEV4WKdABMg',
-        { allowedAud: 'AUD2' }
-      )
-    },
-    { message: 'The aud claim must be a string or an array of strings.' }
-  )
+  let token = sign({
+    a: 1,
+    jti: 1,
+    aud: 2,
+    iss: 3,
+    sub: 4,
+    nonce: 5
+  })
+  t.assert.throws(() => verify(token, { allowedAud: 'AUD2' }), {
+    message: 'The aud claim must be a string or an array of strings.'
+  })
 
-  t.assert.throws(
-    () => {
-      return verify(
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhIjoxLCJqdGkiOiJKVEkiLCJhdWQiOlsiQVVEMSIsIkRVQTIiXSwiaXNzIjoiSVNTIiwic3ViIjoiU1VCIiwibm9uY2UiOiJOT05DRSJ9.8fqzi23J-GjaD7rW3OYJv8UtBYkx8MOkViJjS4sXmVw',
-        { allowedAud: 'AUD2' }
-      )
-    },
-    { message: 'None of aud claim values are allowed.' }
-  )
+  token = sign({
+    a: 1,
+    jti: 1,
+    aud: [2.1, 2.2],
+    iss: 3,
+    sub: 4,
+    nonce: 5
+  })
+  t.assert.throws(() => verify(token, { allowedAud: 'AUD2' }), {
+    message: 'The aud claim must be a string or an array of strings.'
+  })
 
-  t.assert.throws(
-    () => {
-      return verify(
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhIjoxLCJqdGkiOiJKVEkiLCJhdWQiOlsiQVVEMSIsIkRVQTIiXSwiaXNzIjoiSVNTIiwic3ViIjoiU1VCIiwibm9uY2UiOiJOT05DRSJ9.8fqzi23J-GjaD7rW3OYJv8UtBYkx8MOkViJjS4sXmVw',
-        { allowedAud: [/abc/, 'cde'] }
-      )
-    },
-    { message: 'None of aud claim values are allowed.' }
-  )
+  token = sign({
+    a: 1,
+    jti: 1,
+    aud: ['AUD', 2.2],
+    iss: 3,
+    sub: 4,
+    nonce: 5
+  })
+  t.assert.throws(() => verify(token, { allowedAud: 'AUD2' }), {
+    message: 'The aud claim must be a string or an array of strings.'
+  })
 
-  t.assert.deepStrictEqual(
-    verify(
-      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhIjoxLCJqdGkiOiJKVEkiLCJhdWQiOlsiQVVEIiwiRFVBMiJdLCJpc3MiOiJJU1MiLCJzdWIiOiJTVUIiLCJub25jZSI6Ik5PTkNFIn0.lhu5t694BY0QmF7SChUw7Z9nUPtupWCkhrQ2rqN06GU',
-      { allowedAud: 'AUD' }
-    ),
-    {
-      a: 1,
-      jti: 'JTI',
-      aud: ['AUD', 'DUA2'],
-      iss: 'ISS',
-      sub: 'SUB',
-      nonce: 'NONCE'
-    }
-  )
+  token = sign({
+    a: 1,
+    jti: 'JTI',
+    aud: ['AUD1', 'DUA2'],
+    iss: 'ISS',
+    sub: 'SUB',
+    nonce: 'NONCE'
+  })
+  t.assert.throws(() => verify(token, { allowedAud: 'AUD2' }), { message: 'None of aud claim values are allowed.' })
 
-  t.assert.deepStrictEqual(
-    verify(
-      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhIjoxLCJqdGkiOiJKVEkiLCJhdWQiOlsiQVVEMSIsIkRVQTIiXSwiaXNzIjoiSVNTIiwic3ViIjoiU1VCIiwibm9uY2UiOiJOT05DRSJ9.8fqzi23J-GjaD7rW3OYJv8UtBYkx8MOkViJjS4sXmVw',
-      { allowedAud: ['ABX', 'AUD1'] }
-    ),
-    {
-      a: 1,
-      jti: 'JTI',
-      aud: ['AUD1', 'DUA2'],
-      iss: 'ISS',
-      sub: 'SUB',
-      nonce: 'NONCE'
-    }
-  )
+  token = sign({
+    a: 1,
+    jti: 'JTI',
+    aud: ['AUD1', 'DUA2'],
+    iss: 'ISS',
+    sub: 'SUB',
+    nonce: 'NONCE'
+  })
+  t.assert.throws(() => verify(token, { allowedAud: [/abc/, 'cde'] }), {
+    message: 'None of aud claim values are allowed.'
+  })
 
-  t.assert.deepStrictEqual(
-    verify(
-      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhIjoxLCJqdGkiOiJKVEkiLCJhdWQiOlsiQVVEMSIsIkRVQTIiXSwiaXNzIjoiSVNTIiwic3ViIjoiU1VCIiwibm9uY2UiOiJOT05DRSJ9.8fqzi23J-GjaD7rW3OYJv8UtBYkx8MOkViJjS4sXmVw',
-      { allowedAud: ['ABX', /^D/] }
-    ),
-    {
-      a: 1,
-      jti: 'JTI',
-      aud: ['AUD1', 'DUA2'],
-      iss: 'ISS',
-      sub: 'SUB',
-      nonce: 'NONCE'
-    }
-  )
+  token = sign({
+    a: 1,
+    jti: 'JTI',
+    aud: ['AUD', 'DUA2'],
+    iss: 'ISS',
+    sub: 'SUB',
+    nonce: 'NONCE'
+  })
+  t.assert.deepStrictEqual(verify(token, { allowedAud: 'AUD' }), {
+    a: 1,
+    iat: 100,
+    jti: 'JTI',
+    aud: ['AUD', 'DUA2'],
+    iss: 'ISS',
+    sub: 'SUB',
+    nonce: 'NONCE'
+  })
+
+  token = sign({
+    a: 1,
+    jti: 'JTI',
+    aud: 'AUD',
+    iss: 'ISS',
+    sub: 'SUB',
+    nonce: 'NONCE'
+  })
+  t.assert.deepStrictEqual(verify(token, { allowedAud: 'AUD' }), {
+    a: 1,
+    iat: 100,
+    jti: 'JTI',
+    aud: 'AUD',
+    iss: 'ISS',
+    sub: 'SUB',
+    nonce: 'NONCE'
+  })
+
+  token = sign({
+    a: 1,
+    jti: 'JTI',
+    aud: ['AUD1', 'DUA2'],
+    iss: 'ISS',
+    sub: 'SUB',
+    nonce: 'NONCE'
+  })
+  t.assert.deepStrictEqual(verify(token, { allowedAud: ['ABX', 'AUD1'] }), {
+    a: 1,
+    iat: 100,
+    jti: 'JTI',
+    aud: ['AUD1', 'DUA2'],
+    iss: 'ISS',
+    sub: 'SUB',
+    nonce: 'NONCE'
+  })
+
+  token = sign({
+    a: 1,
+    jti: 'JTI',
+    aud: ['AUD1', 'DUA2'],
+    iss: 'ISS',
+    sub: 'SUB',
+    nonce: 'NONCE'
+  })
+  t.assert.deepStrictEqual(verify(token, { allowedAud: ['ABX', /^D/] }), {
+    a: 1,
+    iat: 100,
+    jti: 'JTI',
+    aud: ['AUD1', 'DUA2'],
+    iss: 'ISS',
+    sub: 'SUB',
+    nonce: 'NONCE'
+  })
+
+  token = sign({
+    a: 1,
+    jti: 'JTI',
+    aud: 'DUA2',
+    iss: 'ISS',
+    sub: 'SUB',
+    nonce: 'NONCE'
+  })
+  t.assert.deepStrictEqual(verify(token, { allowedAud: ['ABX', /^D/] }), {
+    a: 1,
+    iat: 100,
+    jti: 'JTI',
+    aud: 'DUA2',
+    iss: 'ISS',
+    sub: 'SUB',
+    nonce: 'NONCE'
+  })
 })
 
 test('it validates the iss claim only if explicitily enabled', t => {
-  t.assert.throws(
-    () => {
-      return verify(
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhIjoxLCJqdGkiOjEsImF1ZCI6MiwiaXNzIjozLCJzdWIiOjQsIm5vbmNlIjo1fQ.J-oaiNMlIJfH1jlNZcRjcEXdG5La4lKGjYtoLMs8vKM',
-        { allowedIss: 'ISS1' }
-      )
-    },
-    { message: 'The iss claim must be a string.' }
-  )
+  t.mock.timers.enable({ now: 100000 })
+  const sign = createSigner({ key: 'secret' })
 
-  t.assert.throws(
-    () => {
-      return verify(
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhIjoxLCJqdGkiOiJKVEkiLCJhdWQiOlsiQVVEMSIsIkRVQTIiXSwiaXNzIjoiSVNTIiwic3ViIjoiU1VCIiwibm9uY2UiOiJOT05DRSJ9.8fqzi23J-GjaD7rW3OYJv8UtBYkx8MOkViJjS4sXmVw',
-        { allowedIss: 'ISS1' }
-      )
-    },
-    { message: 'The iss claim value is not allowed.' }
-  )
+  let token = sign({
+    a: 1,
+    jti: 1,
+    aud: 2,
+    iss: 3,
+    sub: 4,
+    nonce: 5
+  })
+  t.assert.throws(() => verify(token, { allowedIss: 'ISS1' }), { message: 'The iss claim must be a string.' })
 
-  t.assert.throws(
-    () => {
-      return verify(
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhIjoxLCJqdGkiOiJKVEkiLCJhdWQiOlsiQVVEMSIsIkRVQTIiXSwiaXNzIjoiSVNTIiwic3ViIjoiU1VCIiwibm9uY2UiOiJOT05DRSJ9.8fqzi23J-GjaD7rW3OYJv8UtBYkx8MOkViJjS4sXmVw',
-        { allowedIss: [/abc/, 'cde'] }
-      )
-    },
-    { message: 'The iss claim value is not allowed.' }
-  )
+  token = sign({
+    a: 1,
+    jti: 'JTI',
+    aud: ['AUD1'],
+    iss: ['ISS', 'ISS1'],
+    sub: 'SUB',
+    nonce: 'NONCE'
+  })
+  t.assert.throws(() => verify(token, { allowedIss: ['ISS'] }), { message: 'The iss claim must be a string.' })
 
-  t.assert.deepStrictEqual(
-    verify(
-      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhIjoxLCJqdGkiOiJKVEkiLCJhdWQiOlsiQVVEMSIsIkRVQTIiXSwiaXNzIjoiSVNTIiwic3ViIjoiU1VCIiwibm9uY2UiOiJOT05DRSJ9.8fqzi23J-GjaD7rW3OYJv8UtBYkx8MOkViJjS4sXmVw',
-      { allowedIss: 'ISS' }
-    ),
-    {
-      a: 1,
-      jti: 'JTI',
-      aud: ['AUD1', 'DUA2'],
-      iss: 'ISS',
-      sub: 'SUB',
-      nonce: 'NONCE'
-    }
-  )
+  token = sign({
+    a: 1,
+    jti: 'JTI',
+    aud: ['AUD1', 'DUA2'],
+    iss: 'ISS',
+    sub: 'SUB',
+    nonce: 'NONCE'
+  })
+  t.assert.throws(() => verify(token, { allowedIss: 'ISS1' }), { message: 'The iss claim value is not allowed.' })
 
-  t.assert.deepStrictEqual(
-    verify(
-      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhIjoxLCJqdGkiOiJKVEkiLCJhdWQiOlsiQVVEMSIsIkRVQTIiXSwiaXNzIjoiSVNTIiwic3ViIjoiU1VCIiwibm9uY2UiOiJOT05DRSJ9.8fqzi23J-GjaD7rW3OYJv8UtBYkx8MOkViJjS4sXmVw',
-      { allowedIss: ['ABX', 'ISS'] }
-    ),
-    {
-      a: 1,
-      jti: 'JTI',
-      aud: ['AUD1', 'DUA2'],
-      iss: 'ISS',
-      sub: 'SUB',
-      nonce: 'NONCE'
-    }
-  )
+  token = sign({
+    a: 1,
+    jti: 'JTI',
+    aud: ['AUD1', 'DUA2'],
+    iss: 'ISS',
+    sub: 'SUB',
+    nonce: 'NONCE'
+  })
+  t.assert.throws(() => verify(token, { allowedIss: [/abc/, 'cde'] }), {
+    message: 'The iss claim value is not allowed.'
+  })
 
-  t.assert.deepStrictEqual(
-    verify(
-      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhIjoxLCJqdGkiOiJKVEkiLCJhdWQiOlsiQVVEMSIsIkRVQTIiXSwiaXNzIjoiSVNTIiwic3ViIjoiU1VCIiwibm9uY2UiOiJOT05DRSJ9.8fqzi23J-GjaD7rW3OYJv8UtBYkx8MOkViJjS4sXmVw',
-      { allowedIss: ['ABX', /^I/] }
-    ),
-    {
-      a: 1,
-      jti: 'JTI',
-      aud: ['AUD1', 'DUA2'],
-      iss: 'ISS',
-      sub: 'SUB',
-      nonce: 'NONCE'
-    }
-  )
+  token = sign({
+    a: 1,
+    jti: 'JTI',
+    aud: ['AUD1', 'DUA2'],
+    iss: 'ISS',
+    sub: 'SUB',
+    nonce: 'NONCE'
+  })
+  t.assert.deepStrictEqual(verify(token, { allowedIss: 'ISS' }), {
+    a: 1,
+    iat: 100,
+    jti: 'JTI',
+    aud: ['AUD1', 'DUA2'],
+    iss: 'ISS',
+    sub: 'SUB',
+    nonce: 'NONCE'
+  })
+
+  token = sign({
+    a: 1,
+    jti: 'JTI',
+    aud: ['AUD1', 'DUA2'],
+    iss: 'ISS',
+    sub: 'SUB',
+    nonce: 'NONCE'
+  })
+  t.assert.deepStrictEqual(verify(token, { allowedIss: ['ABX', 'ISS'] }), {
+    a: 1,
+    iat: 100,
+    jti: 'JTI',
+    aud: ['AUD1', 'DUA2'],
+    iss: 'ISS',
+    sub: 'SUB',
+    nonce: 'NONCE'
+  })
+
+  token = sign({
+    a: 1,
+    jti: 'JTI',
+    aud: ['AUD1', 'DUA2'],
+    iss: 'ISS',
+    sub: 'SUB',
+    nonce: 'NONCE'
+  })
+  t.assert.deepStrictEqual(verify(token, { allowedIss: ['ABX', /^I/] }), {
+    a: 1,
+    iat: 100,
+    jti: 'JTI',
+    aud: ['AUD1', 'DUA2'],
+    iss: 'ISS',
+    sub: 'SUB',
+    nonce: 'NONCE'
+  })
 })
 
 test('it validates the sub claim only if explicitily enabled', t => {
-  t.assert.throws(
-    () => {
-      return verify(
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhIjoxLCJqdGkiOjEsImF1ZCI6MiwiaXNzIjozLCJzdWIiOjQsIm5vbmNlIjo1fQ.J-oaiNMlIJfH1jlNZcRjcEXdG5La4lKGjYtoLMs8vKM',
-        { allowedSub: 'SUB1' }
-      )
-    },
-    { message: 'The sub claim must be a string.' }
-  )
+  t.mock.timers.enable({ now: 100000 })
+  const sign = createSigner({ key: 'secret' })
 
-  t.assert.throws(
-    () => {
-      return verify(
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhIjoxLCJqdGkiOiJKVEkiLCJhdWQiOlsiQVVEMSIsIkRVQTIiXSwiaXNzIjoiSVNTIiwic3ViIjoiU1VCIiwibm9uY2UiOiJOT05DRSJ9.8fqzi23J-GjaD7rW3OYJv8UtBYkx8MOkViJjS4sXmVw',
-        { allowedSub: 'SUB1' }
-      )
-    },
-    { message: 'The sub claim value is not allowed.' }
-  )
+  let token = sign({
+    a: 1,
+    jti: 1,
+    aud: 2,
+    iss: 3,
+    sub: 4,
+    nonce: 5
+  })
+  t.assert.throws(() => verify(token, { allowedSub: 'SUB1' }), { message: 'The sub claim must be a string.' })
 
-  t.assert.throws(
-    () => {
-      return verify(
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhIjoxLCJqdGkiOiJKVEkiLCJhdWQiOlsiQVVEMSIsIkRVQTIiXSwiaXNzIjoiSVNTIiwic3ViIjoiU1VCIiwibm9uY2UiOiJOT05DRSJ9.8fqzi23J-GjaD7rW3OYJv8UtBYkx8MOkViJjS4sXmVw',
-        { allowedSub: [/abc/, 'cde'] }
-      )
-    },
-    { message: 'The sub claim value is not allowed.' }
-  )
+  token = sign({
+    a: 1,
+    jti: 'JTI',
+    aud: ['AUD1', 'DUA2'],
+    iss: 'ISS',
+    sub: 'SUB',
+    nonce: 'NONCE'
+  })
+  t.assert.throws(() => verify(token, { allowedSub: 'SUB1' }), { message: 'The sub claim value is not allowed.' })
 
-  t.assert.deepStrictEqual(
-    verify(
-      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhIjoxLCJqdGkiOiJKVEkiLCJhdWQiOlsiQVVEMSIsIkRVQTIiXSwiaXNzIjoiSVNTIiwic3ViIjoiU1VCIiwibm9uY2UiOiJOT05DRSJ9.8fqzi23J-GjaD7rW3OYJv8UtBYkx8MOkViJjS4sXmVw',
-      { allowedSub: 'SUB' }
-    ),
-    {
-      a: 1,
-      jti: 'JTI',
-      aud: ['AUD1', 'DUA2'],
-      iss: 'ISS',
-      sub: 'SUB',
-      nonce: 'NONCE'
-    }
-  )
+  token = sign({
+    a: 1,
+    jti: 'JTI',
+    aud: ['AUD1', 'DUA2'],
+    iss: 'ISS',
+    sub: 'SUB',
+    nonce: 'NONCE'
+  })
+  t.assert.throws(() => verify(token, { allowedSub: [/abc/, 'cde'] }), {
+    message: 'The sub claim value is not allowed.'
+  })
 
-  t.assert.deepStrictEqual(
-    verify(
-      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhIjoxLCJqdGkiOiJKVEkiLCJhdWQiOlsiQVVEMSIsIkRVQTIiXSwiaXNzIjoiSVNTIiwic3ViIjoiU1VCIiwibm9uY2UiOiJOT05DRSJ9.8fqzi23J-GjaD7rW3OYJv8UtBYkx8MOkViJjS4sXmVw',
-      { allowedSub: ['ABX', 'SUB'] }
-    ),
-    {
-      a: 1,
-      jti: 'JTI',
-      aud: ['AUD1', 'DUA2'],
-      iss: 'ISS',
-      sub: 'SUB',
-      nonce: 'NONCE'
-    }
-  )
+  token = sign({
+    a: 1,
+    jti: 'JTI',
+    aud: ['AUD1'],
+    iss: 'ISS',
+    sub: ['SUB1', 'SUB2'],
+    nonce: 'NONCE'
+  })
+  t.assert.throws(() => verify(token, { allowedSub: ['SUB1'] }), { message: 'The sub claim must be a string.' })
 
-  t.assert.deepStrictEqual(
-    verify(
-      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhIjoxLCJqdGkiOiJKVEkiLCJhdWQiOlsiQVVEMSIsIkRVQTIiXSwiaXNzIjoiSVNTIiwic3ViIjoiU1VCIiwibm9uY2UiOiJOT05DRSJ9.8fqzi23J-GjaD7rW3OYJv8UtBYkx8MOkViJjS4sXmVw',
-      { allowedSub: ['ABX', /^S/] }
-    ),
-    {
-      a: 1,
-      jti: 'JTI',
-      aud: ['AUD1', 'DUA2'],
-      iss: 'ISS',
-      sub: 'SUB',
-      nonce: 'NONCE'
-    }
-  )
+  token = sign({
+    a: 1,
+    jti: 'JTI',
+    aud: ['AUD1', 'DUA2'],
+    iss: 'ISS',
+    sub: 'SUB',
+    nonce: 'NONCE'
+  })
+  t.assert.deepStrictEqual(verify(token, { allowedSub: 'SUB' }), {
+    a: 1,
+    iat: 100,
+    jti: 'JTI',
+    aud: ['AUD1', 'DUA2'],
+    iss: 'ISS',
+    sub: 'SUB',
+    nonce: 'NONCE'
+  })
+
+  token = sign({
+    a: 1,
+    jti: 'JTI',
+    aud: ['AUD1', 'DUA2'],
+    iss: 'ISS',
+    sub: 'SUB',
+    nonce: 'NONCE'
+  })
+  t.assert.deepStrictEqual(verify(token, { allowedSub: ['ABX', 'SUB'] }), {
+    a: 1,
+    iat: 100,
+    jti: 'JTI',
+    aud: ['AUD1', 'DUA2'],
+    iss: 'ISS',
+    sub: 'SUB',
+    nonce: 'NONCE'
+  })
+
+  token = sign({
+    a: 1,
+    jti: 'JTI',
+    aud: ['AUD1', 'DUA2'],
+    iss: 'ISS',
+    sub: 'SUB',
+    nonce: 'NONCE'
+  })
+  t.assert.deepStrictEqual(verify(token, { allowedSub: ['ABX', /^S/] }), {
+    a: 1,
+    iat: 100,
+    jti: 'JTI',
+    aud: ['AUD1', 'DUA2'],
+    iss: 'ISS',
+    sub: 'SUB',
+    nonce: 'NONCE'
+  })
 })
 
 test('it validates the nonce claim only if explicitily enabled', t => {
-  t.assert.throws(
-    () => {
-      return verify(
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhIjoxLCJqdGkiOjEsImF1ZCI6MiwiaXNzIjozLCJzdWIiOjQsIm5vbmNlIjo1fQ.J-oaiNMlIJfH1jlNZcRjcEXdG5La4lKGjYtoLMs8vKM',
-        { allowedNonce: 'NONCE1' }
-      )
-    },
-    { message: 'The nonce claim must be a string.' }
-  )
+  t.mock.timers.enable({ now: 100000 })
+  const sign = createSigner({ key: 'secret' })
 
-  t.assert.throws(
-    () => {
-      return verify(
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhIjoxLCJqdGkiOiJKVEkiLCJhdWQiOlsiQVVEMSIsIkRVQTIiXSwiaXNzIjoiSVNTIiwic3ViIjoiU1VCIiwibm9uY2UiOiJOT05DRSJ9.8fqzi23J-GjaD7rW3OYJv8UtBYkx8MOkViJjS4sXmVw',
-        { allowedNonce: 'NONCE1' }
-      )
-    },
-    { message: 'The nonce claim value is not allowed.' }
-  )
+  let token = sign({
+    a: 1,
+    jti: 1,
+    aud: 2,
+    iss: 3,
+    sub: 4,
+    nonce: 5
+  })
+  t.assert.throws(() => verify(token, { allowedNonce: 'NONCE1' }), { message: 'The nonce claim must be a string.' })
 
-  t.assert.throws(
-    () => {
-      return verify(
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhIjoxLCJqdGkiOiJKVEkiLCJhdWQiOlsiQVVEMSIsIkRVQTIiXSwiaXNzIjoiSVNTIiwic3ViIjoiU1VCIiwibm9uY2UiOiJOT05DRSJ9.8fqzi23J-GjaD7rW3OYJv8UtBYkx8MOkViJjS4sXmVw',
-        { allowedNonce: [/abc/, 'cde'] }
-      )
-    },
-    { message: 'The nonce claim value is not allowed.' }
-  )
+  token = sign({
+    a: 1,
+    jti: 'JTI',
+    aud: ['AUD1'],
+    iss: 'ISS',
+    sub: 'SUB',
+    nonce: ['NONCE', 'NONCE1']
+  })
+  t.assert.throws(() => verify(token, { allowedNonce: ['NONCE'] }), { message: 'The nonce claim must be a string.' })
 
-  t.assert.deepStrictEqual(
-    verify(
-      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhIjoxLCJqdGkiOiJKVEkiLCJhdWQiOlsiQVVEMSIsIkRVQTIiXSwiaXNzIjoiSVNTIiwic3ViIjoiU1VCIiwibm9uY2UiOiJOT05DRSJ9.8fqzi23J-GjaD7rW3OYJv8UtBYkx8MOkViJjS4sXmVw',
-      { allowedNonce: 'NONCE' }
-    ),
-    {
-      a: 1,
-      jti: 'JTI',
-      aud: ['AUD1', 'DUA2'],
-      iss: 'ISS',
-      sub: 'SUB',
-      nonce: 'NONCE'
-    }
-  )
+  token = sign({
+    a: 1,
+    jti: 'JTI',
+    aud: ['AUD1', 'DUA2'],
+    iss: 'ISS',
+    sub: 'SUB',
+    nonce: 'NONCE'
+  })
+  t.assert.throws(() => verify(token, { allowedNonce: 'NONCE1' }), { message: 'The nonce claim value is not allowed.' })
 
-  t.assert.deepStrictEqual(
-    verify(
-      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhIjoxLCJqdGkiOiJKVEkiLCJhdWQiOlsiQVVEMSIsIkRVQTIiXSwiaXNzIjoiSVNTIiwic3ViIjoiU1VCIiwibm9uY2UiOiJOT05DRSJ9.8fqzi23J-GjaD7rW3OYJv8UtBYkx8MOkViJjS4sXmVw',
-      { allowedNonce: ['ABX', 'NONCE'] }
-    ),
-    {
-      a: 1,
-      jti: 'JTI',
-      aud: ['AUD1', 'DUA2'],
-      iss: 'ISS',
-      sub: 'SUB',
-      nonce: 'NONCE'
-    }
-  )
+  token = sign({
+    a: 1,
+    jti: 'JTI',
+    aud: ['AUD1', 'DUA2'],
+    iss: 'ISS',
+    sub: 'SUB',
+    nonce: 'NONCE'
+  })
+  t.assert.throws(() => verify(token, { allowedNonce: [/abc/, 'cde'] }), {
+    message: 'The nonce claim value is not allowed.'
+  })
 
-  t.assert.deepStrictEqual(
-    verify(
-      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhIjoxLCJqdGkiOiJKVEkiLCJhdWQiOlsiQVVEMSIsIkRVQTIiXSwiaXNzIjoiSVNTIiwic3ViIjoiU1VCIiwibm9uY2UiOiJOT05DRSJ9.8fqzi23J-GjaD7rW3OYJv8UtBYkx8MOkViJjS4sXmVw',
-      { allowedNonce: ['ABX', /^N/] }
-    ),
-    {
-      a: 1,
-      jti: 'JTI',
-      aud: ['AUD1', 'DUA2'],
-      iss: 'ISS',
-      sub: 'SUB',
-      nonce: 'NONCE'
-    }
-  )
+  token = sign({
+    a: 1,
+    jti: 'JTI',
+    aud: ['AUD1', 'DUA2'],
+    iss: 'ISS',
+    sub: 'SUB',
+    nonce: 'NONCE'
+  })
+  t.assert.deepStrictEqual(verify(token, { allowedNonce: 'NONCE' }), {
+    a: 1,
+    iat: 100,
+    jti: 'JTI',
+    aud: ['AUD1', 'DUA2'],
+    iss: 'ISS',
+    sub: 'SUB',
+    nonce: 'NONCE'
+  })
+
+  token = sign({
+    a: 1,
+    jti: 'JTI',
+    aud: ['AUD1', 'DUA2'],
+    iss: 'ISS',
+    sub: 'SUB',
+    nonce: 'NONCE'
+  })
+  t.assert.deepStrictEqual(verify(token, { allowedNonce: ['ABX', 'NONCE'] }), {
+    a: 1,
+    iat: 100,
+    jti: 'JTI',
+    aud: ['AUD1', 'DUA2'],
+    iss: 'ISS',
+    sub: 'SUB',
+    nonce: 'NONCE'
+  })
+
+  token = sign({
+    a: 1,
+    jti: 'JTI',
+    aud: ['AUD1', 'DUA2'],
+    iss: 'ISS',
+    sub: 'SUB',
+    nonce: 'NONCE'
+  })
+  t.assert.deepStrictEqual(verify(token, { allowedNonce: ['ABX', /^N/] }), {
+    a: 1,
+    iat: 100,
+    jti: 'JTI',
+    aud: ['AUD1', 'DUA2'],
+    iss: 'ISS',
+    sub: 'SUB',
+    nonce: 'NONCE'
+  })
 })
 
 test('it validates allowed claims values using equality when appropriate', t => {
